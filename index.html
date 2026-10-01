@@ -549,7 +549,7 @@ body.lesson .wk { font-size: 1em; }
         S.bx = geo.M.x + v * c * t;
         S.by = geo.M.y + v * sn * t - 0.5 * g * t * t;
         if (Math.hypot(S.bx - S.mx, S.by - S.my) < geo.hitR) {
-          S.hit = true; S.hitT = t; S.bAlive = false;
+          S.hit = true; S.hitT = t; S.bAlive = false; S.hitReal = performance.now() / 1000;
           S.hitOff = { x: Math.max(-geo.hitR, Math.min(0, S.bx - S.mx)), y: S.by - S.my };
           if (!S.mFalling) { S.mFalling = true; S.mStartT = t; }
           hits++; updateScore(); boing(); scream();
@@ -687,8 +687,17 @@ body.lesson .wk { font-size: 1em; }
     const since = performance.now() / 1000 - fireRealT;
     const recoil = since >= 0 && since < 0.6 ? Math.exp(-since * 9) * Math.sin(Math.min(since * 30, Math.PI / 2)) * 0.28 * k : 0;
     const breathe = reduceMotion ? 0 : Math.sin(time * 2.2) * 0.02 * k;
-    const ang = -geo.a;
-    const px = X(geo.piv.x) - Math.cos(geo.a) * recoil, py = Y(geo.piv.y) + Math.sin(geo.a) * recoil * 0.6 + breathe;
+    // celebration after a hit: rifle swings up overhead, hunter hops and pumps it
+    const now = performance.now() / 1000;
+    const c0 = shot && shot.hit && shot.hitReal ? Math.min(1, (now - shot.hitReal) / 0.35) : 0;
+    const cel = c0 * c0 * (3 - 2 * c0);
+    const pump = cel && !reduceMotion ? Math.abs(Math.sin((now - shot.hitReal) * 7)) : 0;
+    const aEff = geo.a + (Math.PI / 2 - 0.2 - geo.a) * cel;
+    const ang = -aEff;
+    const px = X(geo.piv.x) - Math.cos(aEff) * recoil - 0.3 * k * cel,
+          py = Y(geo.piv.y) + Math.sin(aEff) * recoil * 0.6 + breathe - (0.7 + 0.25 * pump) * k * cel;
+    const hop = 0.12 * k * cel * pump;
+    ctx.save(); ctx.translate(0, -hop);
 
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     // legs
@@ -718,7 +727,8 @@ body.lesson .wk { font-size: 1em; }
     ctx.strokeStyle = '#2b1a10'; ctx.lineWidth = 0.035 * k;
     ctx.beginPath(); ctx.moveTo(hx + 0.07 * k, hy + 0.01 * k); ctx.lineTo(hx + 0.15 * k, hy + 0.01 * k); ctx.stroke();
     ctx.fillStyle = '#6a4630';
-    ctx.beginPath(); ctx.arc(hx + 0.08 * k, hy + 0.11 * k, 0.05 * k, 0, Math.PI); ctx.fill();
+    if (cel > 0.5) { ctx.beginPath(); ctx.ellipse(hx + 0.08 * k, hy + 0.1 * k, 0.07 * k, 0.06 * k, 0, 0, 7); ctx.fill(); }
+    else { ctx.beginPath(); ctx.arc(hx + 0.08 * k, hy + 0.11 * k, 0.05 * k, 0, Math.PI); ctx.fill(); }
 
     // rifle (in rotated frame, x along barrel)
     ctx.save(); ctx.translate(px, py); ctx.rotate(ang);
@@ -757,6 +767,20 @@ body.lesson .wk { font-size: 1em; }
       ctx.beginPath(); ctx.arc(0.08 * k, 0, 0.14 * k, 0, 7); ctx.fill();
       ctx.restore();
     }
+    // "Yes!" speech bubble
+    if (cel > 0.3) {
+      const bx = hx - 1.1 * k, by = hy - 0.75 * k, fs = Math.max(13, 0.42 * k);
+      ctx.globalAlpha = Math.min(1, (cel - 0.3) / 0.4);
+      ctx.font = `${fs}px "Lilita One", "Arial Rounded MT Bold", sans-serif`;
+      const tw = ctx.measureText('Yes!').width;
+      ctx.fillStyle = '#fffdf2'; ctx.strokeStyle = '#2a1c00'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(bx, by, tw * 0.75 + 6, fs * 0.85, 0, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bx + tw * 0.35, by + fs * 0.7); ctx.lineTo(hx - 0.15 * k, hy - 0.2 * k); ctx.lineTo(bx + tw * 0.6, by + fs * 0.55); ctx.fill();
+      ctx.fillStyle = '#b42814'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('Yes!', bx, by + 1);
+      ctx.textBaseline = 'alphabetic'; ctx.globalAlpha = 1;
+    }
+    ctx.restore();
   }
 
   function drawMonkey(time) {
