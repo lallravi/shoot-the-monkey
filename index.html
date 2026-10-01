@@ -127,7 +127,25 @@ svg.fig { background: #cdeccf; border-radius: 12px; }
 .skip { margin: 0; text-align: center; }
 button.link { border: none; background: none; color: var(--muted); text-decoration: underline; padding: 4px; font-weight: 400; }
 .simwrap { display: grid; gap: 16px; }
-.simbar { display: flex; }
+.simbar { display: flex; flex-wrap: wrap; gap: 10px; }
+.restart { margin: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; }
+
+/* lesson mode: the slides fill the whole window */
+body.lesson { padding-block: 12px; }
+body.lesson .wrap { max-width: 1440px; min-height: calc(100vh - 24px); min-height: calc(100dvh - 24px); grid-template-rows: auto 1fr; gap: 12px; }
+body.lesson header p { font-size: 14px; }
+body.lesson .intro { grid-template-rows: 1fr auto auto; min-height: 0; }
+body.lesson .slides { display: grid; min-height: 0; }
+body.lesson .slide { min-height: 0; height: 100%; padding: clamp(20px, 4vw, 60px); gap: clamp(24px, 4vw, 72px); }
+body.lesson .copy { max-width: 68ch; font-size: clamp(15px, 1.2vw, 19px); }
+body.lesson .copy h2 { font-size: clamp(26px, 3.4vw, 48px); margin-bottom: 18px; }
+body.lesson .note { font-size: 0.92em; }
+body.lesson .formula { font-size: clamp(22px, 2vw, 30px); }
+body.lesson table { font-size: clamp(13px, 1vw, 16px); }
+body.lesson svg.fig { max-height: calc(100vh - 230px); max-height: calc(100dvh - 230px); }
+body.lesson .worked, body.lesson .summary { font-size: clamp(14px, 1.1vw, 17px); padding: clamp(18px, 2vw, 28px); }
+body.lesson .wk { font-size: 1em; }
+@media (max-width: 760px) { body.lesson .slide { height: auto; } body.lesson svg.fig { max-height: none; } }
 .score { font-family: var(--mono); font-size: 13px; color: var(--muted); margin-left: auto; align-self: center; }
 </style>
 </head>
@@ -295,11 +313,11 @@ button.link { border: none; background: none; color: var(--muted); text-decorati
       <div class="dots" id="dots"></div>
       <button id="next">Next →</button>
     </nav>
-    <p class="skip"><button class="link" id="skip">Skip to the simulation</button></p>
+    <p class="restart"><button class="link" id="again" hidden>↺ Start again from step 1</button><button class="link" id="skip">Skip to the simulation</button></p>
   </section>
 
   <div id="sim" class="simwrap" hidden>
-  <div class="simbar"><button id="backIntro">← Back to the explanation</button></div>
+  <div class="simbar"><button id="backIntro">← Back to the explanation</button><button id="startOver">↺ Start over from the beginning</button></div>
   <div class="stage">
     <canvas id="scene" aria-label="Animated scene: a hunter aims a rifle at a monkey hanging from a tree branch"></canvas>
     <div class="banner">
@@ -1022,20 +1040,35 @@ button.link { border: none; background: none; color: var(--muted); text-decorati
     [...dots.children].forEach((d, j) => d.setAttribute('aria-current', j === cur ? 'true' : 'false'));
     $('prev').disabled = cur === 0;
     $('next').textContent = cur === slides.length - 1 ? 'Play ▶' : 'Next →';
+    $('again').hidden = cur === 0;
   }
   function openSim() {
-    $('intro').hidden = true; $('sim').hidden = false;
+    $('intro').hidden = true; $('sim').hidden = false; document.body.classList.remove('lesson');
     reset(); resize();
     window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
   }
   function openIntro(i) {
-    $('sim').hidden = true; $('intro').hidden = false; show(i);
+    $('sim').hidden = true; $('intro').hidden = false; document.body.classList.add('lesson'); show(i);
+    window.scrollTo({ top: 0 });
   }
   $('prev').addEventListener('click', () => show(cur - 1));
   $('next').addEventListener('click', () => cur === slides.length - 1 ? openSim() : show(cur + 1));
   $('play').addEventListener('click', openSim);
   $('skip').addEventListener('click', openSim);
   $('backIntro').addEventListener('click', () => openIntro(0));
+  $('again').addEventListener('click', () => show(0));
+  // start over: clear the score, put every control back to its starting value, return to step 1
+  $('startOver').addEventListener('click', () => {
+    hits = 0; shots = 0; updateScore();
+    document.querySelectorAll('#sim input[type=range]').forEach(el => { el.value = el.defaultValue; });
+    document.querySelectorAll('#sim input[type=checkbox]').forEach(el => { el.checked = el.defaultChecked; });
+    [...$('g').options].forEach(o => { o.selected = o.defaultSelected; });
+    Object.assign(P, { v: +$('v').value, D: +$('d').value, H: +$('h').value, speed: +$('slow').value, g: +$('g').value,
+      letGo: $('letgo').checked, strobe: $('strobe').checked, sound: $('sound').checked });
+    reset();
+    openIntro(0);
+  });
+  document.body.classList.add('lesson');
   show(0);
 
   addEventListener('keydown', e => {
